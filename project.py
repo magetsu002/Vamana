@@ -1,50 +1,61 @@
 import json
-import os
 import sys
 import time
 from datetime import datetime
 from pathlib import Path
 
 
-# ---------------- Action Handlers ----------------
+# ============================================================================
+# ACTION HANDLERS - Execute individual workflow step types
+# ============================================================================
+
 
 def execute_print(step: dict) -> None:
+    """Print a message to console."""
     print(step["message"])
 
 
 def execute_write_file(step: dict) -> None:
-    filename = resolve_safe_path(step["filename"])  # ensure safe path
+    """Write content to a file, overwriting if it exists."""
+    filename = resolve_safe_path(step["filename"])
     content = step["content"]
 
-    with open(filename, "w") as file:
+    with open(filename, "w", encoding="utf-8") as file:
         file.write(content)
 
 
 def execute_append_file(step: dict) -> None:
+    """Append content to an existing file."""
     filename = resolve_safe_path(step["filename"])
     content = step["content"]
 
-    with open(filename, "a") as file:
+    with open(filename, "a", encoding="utf-8") as file:
         file.write(content)
 
 
 def execute_read_file(step: dict) -> None:
+    """Read file content and log the operation."""
     filename = resolve_safe_path(step["filename"])
 
     if not filename.exists():
         raise ValueError("File not found!")
 
-    with open(filename, "r") as file:
+    with open(filename, "r", encoding="utf-8") as file:
         content = file.read()
         log_system_event(f"Read {len(content)} characters from {filename.name}")
 
 
 def execute_wait(step: dict) -> None:
+    """Sleep for specified number of seconds."""
     seconds = step["seconds"]
     time.sleep(seconds)
 
 
-# maps step type → function (core engine idea)
+# ============================================================================
+# STEP CONFIGURATION - Maps step types to handlers and required fields
+# ============================================================================
+
+# Maps step type → function (core engine idea)
 STEP_HANDLERS = {
     "print": execute_print,
     "write_file": execute_write_file,
@@ -53,25 +64,40 @@ STEP_HANDLERS = {
     "wait": execute_wait,
 }
 
-
-# defines required fields per step type
+# Defines required fields per step type
 STEP_SCHEMAS = {
-    "print": ["message"],
-    "write_file": ["filename", "content"],
-    "append_file": ["filename", "content"],
-    "read_file": ["filename"],
-    "wait": ["seconds"],
+    "print": {"message": str},
+    "write_file": {"filename": str, "content": str},
+    "append_file": {"filename": str, "content": str},
+    "read_file": {"filename": str},
+    "wait": {"seconds": (int, float)},
 }
 
 
-# safe workspace directory for file operations
+# ============================================================================
+# CONFIGURATION & LIMITS
+# ============================================================================
+
+# Safe workspace directory for file operations
 SAFE_DIR = Path("workspace")
 SAFE_DIR.mkdir(exist_ok=True)
 
+# Set log path
 SYSTEM_LOG = Path("system.log")
+
+# Max limits and constraints
+MAX_WAIT_SECONDS = 30
+MAX_STEPS = 100
+MAX_WORKFLOW_FILE_SIZE = 100 * 1024
+MAX_TEXT_FIELD = 10 * 1024
+
+# ============================================================================
+# UTILITY FUNCTIONS
+# ============================================================================
 
 
 def show_help() -> None:
+    """Display help information and supported step types."""
     print("Vamana - Mini Workflow Execution Engine")
     print()
     print("Usage:")
@@ -86,24 +112,30 @@ def show_help() -> None:
         print(f"  {step_type:<12} requires: {required}")
 
 
-# logs system events with timestamps
 def log_system_event(message: str) -> None:
-     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-     with open(SYSTEM_LOG, 'a') as f:
-         f.write(f"[{timestamp}] {message}\n")
+    """Log system events with timestamp to system.log file."""
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    with open(SYSTEM_LOG, "a", encoding="utf-8") as f:
+        f.write(f"[{timestamp}] {message}\n")
 
-         # separate runs visually
-         if "finished" in message.lower() or "crashed" in message.lower():
-            f.write("="*120 + "\n\n")
+        # Separate runs visually in log file
+        if "finished" in message.lower() or "crashed" in message.lower():
+            f.write("=" * 120 + "\n\n")
+
+
+# ============================================================================
+# MAIN ENTRY POINT
+# ============================================================================
 
 
 def main() -> None:
-    # handle help flag
+    """Parse command-line arguments and execute workflow."""
+    # Handle help flag
     if len(sys.argv) == 2 and sys.argv[1] in ["-h", "--help"]:
         show_help()
         return
 
-    # require exactly one argument
+    # Require exactly one argument
     if len(sys.argv) != 2:
         sys.exit("Usage: python project.py workflow.json")
 
@@ -112,16 +144,29 @@ def main() -> None:
     try:
         data = load_workflow(filename)
         validate_workflow(data)
-        print(data["name"])  # print workflow name
+        print(data["name"])  # Print workflow name
         run_workflow(data)
     except (FileNotFoundError, ValueError) as e:
         sys.exit(str(e))
 
 
-# loads JSON file into dict
+# ============================================================================
+# WORKFLOW LOADING & VALIDATION
+# ============================================================================
+
+
 def load_workflow(filename: str) -> dict:
+    """Load and parse JSON workflow file."""
+    path = Path(filename)
+
+    if not path.exists():
+        raise FileNotFoundError("File not found!")
+
+    if path.stat().st_size > MAX_WORKFLOW_FILE_SIZE:
+        raise ValueError("Workflow file is too large!")
+
     try:
-        with open(filename) as file:
+        with open(path, encoding="utf-8") as file:
             data = json.load(file)
     except FileNotFoundError:
         raise FileNotFoundError("File not found!")
@@ -131,8 +176,8 @@ def load_workflow(filename: str) -> dict:
     return data
 
 
-# validates top-level workflow structure
 def validate_workflow(data: dict) -> None:
+    """Validate top-level workflow structure and all steps."""
     if not isinstance(data, dict):
         raise ValueError("Data needs to be a dictionary")
 
@@ -148,37 +193,46 @@ def validate_workflow(data: dict) -> None:
         raise ValueError("Name needs to be a string!")
     if not isinstance(steps, list):
         raise ValueError("Steps needs to be a list!")
+    if len(steps) > MAX_STEPS:
+        raise ValueError(f"Workflow cannot have more than {MAX_STEPS} steps!")
+
+    for step in steps:
+        validate_step(step)
 
 
-def get_required_fields(step_type: str) -> list[str]:
-    try:
-        return STEP_SCHEMAS[step_type]
-    except KeyError:
-        raise ValueError(f"Unsupported step type: {step_type}")
-
-
-# validates individual step
 def validate_step(step: dict) -> None:
+    """Validate individual step structure and field constraints."""
     if not isinstance(step, dict):
         raise ValueError("Step needs to be a dictionary!")
     if "type" not in step:
         raise ValueError("Step requires a type!")
 
     step_type = step["type"]
-    allowed_types = ["print", "write_file", "append_file", "read_file", "wait"]
 
-    if step_type not in allowed_types:
-        raise ValueError("Invalid type!")
+    if step_type not in STEP_SCHEMAS:
+        raise ValueError(f"Unsupported step type: {step_type}")
 
-    required_fields = get_required_fields(step_type)
+    required_fields = STEP_SCHEMAS[step_type]
 
-    for field in required_fields:
+    for field, expected_type in required_fields.items():
         if field not in step:
             raise ValueError(f"Missing field: {field}")
+        if not isinstance(step[field], expected_type):
+            raise ValueError(f"Field '{field}' has invalid type")
+        if isinstance(step[field], str) and len(step[field]) > MAX_TEXT_FIELD:
+            raise ValueError(f"Field '{field}' is too long!")
+
+    # Validate wait-specific constraints
+    if step_type == "wait":
+        seconds = step["seconds"]
+        if seconds < 0:
+            raise ValueError("Wait time cannot be negative!")
+        if seconds > MAX_WAIT_SECONDS:
+            raise ValueError(f"Wait time cannot exceed {MAX_WAIT_SECONDS} seconds!")
 
 
-# ensures file operations stay inside SAFE_DIR
 def resolve_safe_path(filename: str) -> Path:
+    """Resolve file path safely within SAFE_DIR, preventing traversal attacks."""
     if not isinstance(filename, str):
         raise ValueError("File name must be a string")
 
@@ -193,8 +247,13 @@ def resolve_safe_path(filename: str) -> Path:
     return SAFE_DIR / path
 
 
-# dispatch step to correct handler
+# ============================================================================
+# STEP EXECUTION
+# ============================================================================
+
+
 def execute_step(step: dict) -> None:
+    """Dispatch step to correct handler function based on type."""
     step_type = step["type"]
 
     try:
@@ -206,11 +265,17 @@ def execute_step(step: dict) -> None:
 
 
 def print_progress(current: int, total: int, step_type: str) -> None:
-     print(f"[{current}/{total}] Executing {step_type}...")
+    """Print progress message during workflow execution."""
+    print(f"[{current}/{total}] Executing {step_type}...")
 
 
-# main workflow runner
+# ============================================================================
+# WORKFLOW EXECUTION
+# ============================================================================
+
+
 def run_workflow(data: dict) -> None:
+    """Execute all steps in workflow with error handling and logging."""
     steps = data["steps"]
     workflow_name = data["name"]
 
@@ -237,8 +302,11 @@ def run_workflow(data: dict) -> None:
         log_system_event(f"CRASHED on Step {completed_steps + 1}: {e}")
         raise
 
-    log_system_event(f"SUCCESS: Workflow '{data['name']}' finished all {total_steps} steps.\n")
+    log_system_event(
+        f"SUCCESS: Workflow '{data['name']}' finished all {total_steps} steps.\n"
+    )
 
+    # Print summary
     print("[Vamana Summary]")
     print(f"Workflow: {workflow_name}")
     print(f"Started: {started_at}")

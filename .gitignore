@@ -1,0 +1,5 @@
+# Ignore JSON workflow and test data files
+*.json
+
+# Ignore log files
+*.log
