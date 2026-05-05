@@ -1,160 +1,204 @@
 # Vamana — Workflow Automation Engine
 
-Vamana is a Python-based workflow automation engine that executes structured JSON workflows step by step.
+Vamana is a Python workflow engine that runs JSON-based workflows step by step with validation, safety checks, and logging.
 
-This project is being built as a long-term systems project, evolving across multiple stages to explore real-world software architecture.
-
----
+This is the project I’ve been using to understand how real systems are built. Not just making something work, but making sure it behaves correctly even when input is bad or unexpected.
 
 ## Overview
 
-Vamana allows workflows to be defined in JSON and executed sequentially.
-
-Example:
+You define a workflow in JSON:
 
 ```json
 {
   "name": "Example Workflow",
   "steps": [
-    { "type": "print", "message": "Hello, World!" },
-    { "type": "wait", "seconds": 2 },
-    { "type": "write_file", "filename": "output.txt", "content": "Done" }
+    {
+      "type": "print",
+      "message": "Hello, World!"
+    },
+    {
+      "type": "wait",
+      "seconds": 2
+    },
+    {
+      "type": "write_file",
+      "filename": "output.txt",
+      "content": "Done"
+    }
   ]
 }
 ```
 
-Run:
+Run it:
 
 ```bash
-python main.py workflows/sample_workflow.json
+python main.py workflows/basic_flow.json
 ```
 
----
-
-## Current Features
-
-- JSON workflow parsing  
-- Step-by-step execution engine  
-- Action handler system  
-- Validation for workflow and steps  
-- Safe file operations (restricted to workspace)  
-- Execution logging with timestamps  
-- Crash detection and reporting  
-
----
-
-## How It Works
+## Example output
 
 ```text
-1. Load workflow JSON
-2. Validate structure
-3. Validate each step
-4. Execute step using handler mapping
-5. Log progress and results
-6. Print execution summary
+basic_demo
+[1/3] Executing print...
+Starting workflow
+[2/3] Executing wait...
+[3/3] Executing print...
+Finished
+
+[Vamana Summary]
+Workflow: basic_demo
+Steps Completed: 3/3
+Status: Workflow ran successfully
 ```
 
----
+## What it does
 
-## Architecture
+- Loads workflows from JSON  
+- Validates everything before execution  
+- Executes steps using a handler system  
+- Restricts file access to a safe workspace  
+- Logs execution with timestamps  
+- Detects crashes and reports them  
+
+## How it works
 
 ```text
-Parser      → Loads JSON workflows  
-Validator   → Ensures correctness  
-Executor    → Runs steps  
-Handlers    → Execute actions  
-Logger      → Records execution  
+load → validate → execute → log → summarize
 ```
 
----
+## Project structure
 
-## Development Journey
+```text
+engine/
+  config.py
+  validation.py
+  handlers.py
+  runner.py
+  security.py
+  logging_utils.py
 
-Vamana started as a simple idea: a mini workflow engine.
+main.py
+workflows/
+tests/
+```
 
-Early attempts failed due to lack of structure and weak validation.
+Each part has a clear role:
 
-Key turning points:
+- validation checks structure, types, and limits  
+- handlers execute each step  
+- runner controls execution flow  
+- security handles safe file access  
+- logging records everything  
+- config defines limits and schemas  
 
-- Introduced step validation before execution  
-- Replaced if/else chains with handler mapping (`STEP_HANDLERS`)  
-- Added schema-based required fields (`STEP_SCHEMAS`)  
-- Implemented safe file handling to prevent path traversal  
-- Built logging system for debugging and visibility  
-- Added progress tracking and execution summary  
+## What went wrong and how I fixed it
 
----
+### Execution limits
 
-## Problems Encountered
+- Workflows could freeze the program  
+  Large wait values would block execution  
+  → added a maximum wait limit  
 
-- Validation happening too late caused runtime crashes  
-- Weak type checking allowed invalid data (e.g. strings for numbers)  
-- Malformed JSON could break execution  
-- File operations were unsafe before path restrictions  
-- Lack of structure made code harder to extend  
+- Multiple waits could still cause long execution  
+  → added a total wait limit across the workflow  
 
----
-
-## Improvements Made
-
-- Separated validation from execution  
-- Added strict required-field checking per step type  
-- Introduced safe directory enforcement (`workspace/`)  
-- Implemented centralized logging (`system.log`)  
-- Improved error messages for debugging  
-- Cleaned execution flow into clear stages  
-
----
-
-## Known Limitations
-
-- Type validation is still basic  
-- `wait` has no upper limit (can freeze execution)  
-- No retry or rollback system  
-- No variables or conditions yet  
-- Architecture is still single-file (not modular yet)  
+- Too many steps could overload execution  
+  → added a step limit  
 
 ---
 
-## Roadmap
+### Validation issues
 
-### Vamana v1 — Python Engine (Completed)
+- Validation was too weak  
+  I was only checking if fields existed  
+  → changed it to enforce both field names and types  
 
-- Workflow execution  
-- Validation system  
-- Logging and error handling  
+- Workflow files could be too large  
+  → added a file size check before loading  
 
-### Vamana v2 — Database Layer (In Progress)
-
-- Store workflows  
-- Track execution history  
-- Query logs and runs  
-
-### Vamana v3 — Web Interface (Planned)
-
-- Simple dashboard to run workflows  
-- View logs and results  
-
-### Vamana v4 — Intelligent Features (Future Exploration)
-
-- Generate workflows from text  
-- Suggest fixes for errors  
+- Text fields could be abused  
+  → added limits on string length  
 
 ---
 
-## Project Goal
+### File safety
 
-To build a progressively more advanced automation system while learning:
+- File access was unsafe  
+  Absolute paths and directory traversal were possible  
+  → blocked both  
 
-- backend architecture  
-- validation systems  
-- execution engines  
-- database design  
-- full-stack development  
-- system design principles  
+- Symlinks could bypass checks  
+  → resolved paths and ensured they stay inside the workspace  
+
+- There was still a race condition risk  
+  → switched to safer file opening using OS-level flags  
+
+- The engine could overwrite its own files  
+  → blocked protected filenames  
 
 ---
+
+### Logging issues
+
+- Logs could be manipulated  
+  → sanitized log messages and removed newlines  
+
+- Logs could get too large  
+  → limited and truncated long messages  
+
+- OS errors were inconsistent  
+  → converted them into clean error messages  
+
+---
+
+### Structure problems
+
+- Validation was duplicated  
+  → removed redundant checks and cleaned the flow  
+
+- Everything was in one file  
+  → split the project into modules  
+
+- Type hints were unclear  
+  → replaced generic dict usage with structured types  
+
+- The project directory got messy  
+  → cleaned it using ignore rules  
+
+## What changed
+
+This went from a simple script into something that:
+
+- validates input properly  
+- enforces limits  
+- prevents unsafe file access  
+- handles edge cases instead of crashing  
+- is structured in a way that can grow  
+
+## Current limitation
+
+- No database yet  
+
+## What I’m building next
+
+Right now I’m adding SQL to Vamana.
+
+The goal is to store workflows and track every run instead of just executing once.
+
+Planned:
+
+- Store workflow definitions  
+- Store run history  
+- Track each step execution  
+- Save errors and crashes  
+- Query previous runs  
+
+## Goal
+
+The goal isn’t to compete with other tools.
+
+It’s to understand how systems behave, where they break, and how to build them properly.
 
 ## Author
 
-Built as a long-term systems engineering project focused on learning by building.
+Built as a personal systems engineering project.
