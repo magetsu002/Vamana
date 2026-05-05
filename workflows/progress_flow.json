@@ -1,0 +1,25 @@
+{
+  "name": "progress_demo",
+  "steps": [
+    {
+      "type": "print",
+      "message": "Step 1"
+    },
+    {
+      "type": "wait",
+      "seconds": 1
+    },
+    {
+      "type": "print",
+      "message": "Step 2"
+    },
+    {
+      "type": "wait",
+      "seconds": 1
+    },
+    {
+      "type": "print",
+      "message": "Step 3"
+    }
+  ]
+}

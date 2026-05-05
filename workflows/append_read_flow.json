@@ -1,0 +1,19 @@
+{
+  "name": "append_and_read",
+  "steps": [
+    {
+      "type": "write_file",
+      "filename": "log.txt",
+      "content": "First line\n"
+    },
+    {
+      "type": "append_file",
+      "filename": "log.txt",
+      "content": "Second line\n"
+    },
+    {
+      "type": "read_file",
+      "filename": "log.txt"
+    }
+  ]
+}

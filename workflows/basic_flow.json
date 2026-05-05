@@ -1,0 +1,17 @@
+{
+  "name": "basic_demo",
+  "steps": [
+    {
+      "type": "print",
+      "message": "Starting workflow"
+    },
+    {
+      "type": "wait",
+      "seconds": 1
+    },
+    {
+      "type": "print",
+      "message": "Finished"
+    }
+  ]
+}

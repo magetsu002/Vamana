@@ -1,11 +1,12 @@
 import pytest
 from pathlib import Path
-from project import resolve_safe_path, validate_workflow, validate_step
+from engine.security import resolve_safe_path
+from engine.validation import validate_workflow, validate_step
 
 # 1. Test Path Security (resolve_safe_path)
 def test_resolve_safe_path():
     # Test valid filename
-    assert resolve_safe_path("test.txt") == Path("workspace/test.txt")
+    assert resolve_safe_path("test.txt") == Path("workspace/test.txt").resolve()
 
     # Test that absolute paths raise a ValueError
     with pytest.raises(ValueError):

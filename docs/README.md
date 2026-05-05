@@ -24,7 +24,7 @@ Vamana executes workflows defined in JSON:
 Run:
 
 ```bash
-python project.py workflow.json
+python main.py workflows/sample_workflow.json
 ```
 
 ---

@@ -1,0 +1,18 @@
+{
+  "name": "write_file_demo",
+  "steps": [
+    {
+      "type": "print",
+      "message": "Creating file..."
+    },
+    {
+      "type": "write_file",
+      "filename": "hello.txt",
+      "content": "Hello from Vamana"
+    },
+    {
+      "type": "print",
+      "message": "File created"
+    }
+  ]
+}

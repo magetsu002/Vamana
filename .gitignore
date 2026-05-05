@@ -1,5 +1,18 @@
-# Ignore JSON workflow and test data files
-*.json
+# Python cache
+__pycache__/
+*.pyc
 
-# Ignore log files
-*.log
+# Virtual environments
+.venv/
+venv/
+
+# Logs & runtime files
+system.log
+workspace/
+
+# Tool caches
+.pytest_cache/
+.ruff_cache/
+
+# OS
+.DS_Store
